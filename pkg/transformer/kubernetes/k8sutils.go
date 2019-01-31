@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"os"
 	"path"
 	"path/filepath"
@@ -305,6 +306,13 @@ func (k *Kubernetes) CreateService(name string, service kobject.ServiceConfig, o
 
 	// Configure annotations
 	annotations := transformer.ConfigAnnotations(service)
+
+	// Aliyun extension begin
+	for k, v := range service.ServiceAnnotations {
+		annotations[k] = v
+	}
+	// Aliyun extension end
+
 	svc.ObjectMeta.Annotations = annotations
 
 	return svc
@@ -359,6 +367,13 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 
 	}
 
+	// Aliyun extension begin
+	logVolumesMount, logVolumes := k.ConfigLogVolumes(name, service)
+	volumes = append(volumes, logVolumes...)
+	volumesMount = append(volumesMount, logVolumesMount...)
+
+	// Aliyun extension end
+
 	if pvc != nil {
 		// Looping on the slice pvc instead of `*objects = append(*objects, pvc...)`
 		// because the type of objects and pvc is different, but when doing append
@@ -402,6 +417,20 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 						Command: service.HealthChecks.Test,
 					},
 				}
+				// Aliyun extensions begin
+			} else if service.HealthChecks.TCPSocket != nil {
+				probe.Handler = api.Handler{
+					TCPSocket: &api.TCPSocketAction{
+						Port: intstr.FromInt(service.HealthChecks.TCPSocket.Port),
+					},
+				}
+			} else if service.HealthChecks.HTTPGet != nil {
+				probe.Handler = api.Handler{
+					HTTPGet: &api.HTTPGetAction{
+						Path: service.HealthChecks.HTTPGet.Path,
+						Port: intstr.FromInt(service.HealthChecks.HTTPGet.Port),
+					},
+				} // Aliyun extensions end
 			} else {
 				return errors.New("Health check must contain a command")
 			}
@@ -426,7 +455,7 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 		}
 
 		// Configure the resource limits
-		if service.MemLimit != 0 || service.CPULimit != 0 {
+		if service.MemLimit != 0 || service.CPULimit != 0 || service.GPUs != 0 {
 			resourceLimit := api.ResourceList{}
 
 			if service.MemLimit != 0 {
@@ -435,6 +464,10 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 
 			if service.CPULimit != 0 {
 				resourceLimit[api.ResourceCPU] = *resource.NewMilliQuantity(service.CPULimit, resource.DecimalSI)
+			}
+
+			if service.GPUs != 0 {
+				resourceLimit["nvidia.com/gpu"] = *resource.NewQuantity(int64(service.GPUs), resource.DecimalSI)
 			}
 
 			template.Spec.Containers[0].Resources.Limits = resourceLimit

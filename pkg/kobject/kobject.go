@@ -113,6 +113,13 @@ type ServiceConfig struct {
 	Configs []dockerCliTypes.ServiceConfigObjConfig `compose:""`
 	//This is for SHORT SYNTAX link(https://docs.docker.com/compose/compose-file/#configs)
 	ConfigsMetaData map[string]dockerCliTypes.ConfigObjConfig `compose:""`
+
+	// Aliyun Extensions
+	External           External          `compose:"external"`
+	ServiceAnnotations map[string]string `compose:""`
+	ExposeServicePath  string            `compose:"kompose.service.path"`
+	GPUs               int               `compose:""`
+	LogVolumes         map[string]string `compose:""`
 }
 
 // HealthCheck the healthcheck configuration for a service
@@ -125,6 +132,10 @@ type HealthCheck struct {
 	Retries     int32
 	StartPeriod int32
 	Disable     bool
+
+	//Aliyun extension
+	HTTPGet   *HTTPGetAction
+	TCPSocket *TCPSocketAction
 }
 
 // EnvVar holds the environment variable struct of a container

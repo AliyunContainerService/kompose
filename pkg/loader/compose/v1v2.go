@@ -282,9 +282,14 @@ func libComposeToKomposeMapping(composeObject *project.Project) (kobject.Kompose
 		}
 		serviceConfig.GroupAdd = groupAdd
 
-		komposeObject.ServiceConfigs[normalizeServiceNames(name)] = serviceConfig
-		if normalizeServiceNames(name) != name {
-			log.Infof("Service name in docker-compose has been changed from %q to %q", name, normalizeServiceNames(name))
+		normalizedName := normalizeServiceNames(name)
+
+		//Handle Aliyun extensions
+		handleAliyunExt(normalizedName, &serviceConfig)
+
+		komposeObject.ServiceConfigs[normalizedName] = serviceConfig
+		if normalizedName != name {
+			log.Infof("Service name in docker-compose has been changed from %q to %q", name, normalizedName)
 		}
 	}
 
