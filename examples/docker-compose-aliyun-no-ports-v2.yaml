@@ -1,0 +1,32 @@
+version: "2"
+services:
+  web:
+    image: wordpress:4.2
+    environment:
+    - WORDPRESS_AUTH_KEY=changeme
+    - WORDPRESS_SECURE_AUTH_KEY=changeme
+    - WORDPRESS_LOGGED_IN_KEY=changeme
+    - WORDPRESS_NONCE_KEY=changeme
+    - WORDPRESS_AUTH_SALT=changeme
+    - WORDPRESS_SECURE_AUTH_SALT=changeme
+    - WORDPRESS_LOGGED_IN_SALT=changeme
+    - WORDPRESS_NONCE_SALT=changeme
+    restart: always
+    links:
+    - db:mysql
+    labels:
+      aliyun.log_store_wordpress: stdout
+      aliyun.probe.url: http://container/license.txt
+      aliyun.probe.initial_delay_seconds: "10"
+      aliyun.routing.port_80: wordpress;http://www.example.com;https://www.nice.com
+      #aliyun.lb.port_80: http://slb_example_name:8080
+      aliyun.scale: "3"
+  db:
+    image: mysql:5.6
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+    restart: always
+    labels:
+      aliyun.gpu: "1"
+      aliyun.log_store_mysql-stdout: stdout
+      aliyun.log_store_mysql-varlog: /var/log/*.log

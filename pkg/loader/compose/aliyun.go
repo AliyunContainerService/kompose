@@ -5,6 +5,7 @@ import (
 	"github.com/flynn/go-shlex"
 	"github.com/kubernetes/kompose/pkg/kobject"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/pkg/api"
 	"net"
 	"net/url"
@@ -114,14 +115,19 @@ func handleAliyunExt(svcName string, service *kobject.ServiceConfig) {
 			if strings.HasPrefix(key, LABEL_SERVICE_LB_PORT_PREFIX) {
 				service.ServiceType = string(api.ServiceTypeLoadBalancer)
 				service.ServiceAnnotations, err = parseLbs(key, value)
+				if err == nil {
+					err = checkAndAddingPort(key[len(LABEL_SERVICE_LB_PORT_PREFIX):], service)
+				}
 			}
 
 			if strings.HasPrefix(key, LABEL_SERVICE_ROUTING_PORT_PREFIX) {
 				var routings []Routing
 				routings, err = parseRouting(key, value)
+				log.Warnf("Handling aliyun routings label: %v", routings)
 				if err == nil && len(routings) > 0 {
 					service.ExposeService = routings[0].VirtualHost
 					service.ExposeServicePath = routings[0].ContextRoot
+					err = checkAndAddingPort(key[len(LABEL_SERVICE_ROUTING_PORT_PREFIX):], service)
 				}
 			}
 
@@ -148,6 +154,26 @@ func handleAliyunExt(svcName string, service *kobject.ServiceConfig) {
 			errors.Wrap(err, fmt.Sprint("invalid value for %s label: %s", key, value))
 		}
 	}
+}
+
+func checkAndAddingPort(value string, service *kobject.ServiceConfig) error {
+	//Append port
+	found := false
+	p, err := strconv.Atoi(value)
+	if err == nil {
+		for _, port := range service.Port {
+			if port.ContainerPort == int32(p) {
+				found = true
+			}
+		}
+		if !found {
+			service.Port = append(service.Port, kobject.Ports{
+				ContainerPort: int32(p),
+				Protocol:      api.ProtocolTCP,
+			})
+		}
+	}
+	return nil
 }
 
 const _CONTAINER = "container"
