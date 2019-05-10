@@ -534,6 +534,7 @@ func (k *Kubernetes) ConfigVolumes(name string, service kobject.ServiceConfig) (
 	// as opposed to persistent volumes and volume claims
 	useEmptyVolumes := k.Opt.EmptyVols
 	useHostPath := false
+	usePH := false
 
 	if k.Opt.Volumes == "emptyDir" {
 		useEmptyVolumes = true
@@ -541,6 +542,10 @@ func (k *Kubernetes) ConfigVolumes(name string, service kobject.ServiceConfig) (
 
 	if k.Opt.Volumes == "hostPath" {
 		useHostPath = true
+	}
+
+	if k.Opt.Volumes == "PersistentVolumeClaimOrHostPath" {
+		usePH = true
 	}
 
 	var count int
@@ -551,6 +556,11 @@ func (k *Kubernetes) ConfigVolumes(name string, service kobject.ServiceConfig) (
 		readonly := len(volume.Mode) > 0 && volume.Mode == "ro"
 
 		if volume.VolumeName == "" {
+
+			if usePH {
+				volumeName = strings.Replace(volume.PVCName, "claim", "hostpath", 1)
+			}
+
 			if useEmptyVolumes {
 				volumeName = strings.Replace(volume.PVCName, "claim", "empty", 1)
 			} else if useHostPath {
@@ -572,7 +582,17 @@ func (k *Kubernetes) ConfigVolumes(name string, service kobject.ServiceConfig) (
 		// For PVC we will also create a PVC object and add to list
 		var volsource *api.VolumeSource
 
-		if useEmptyVolumes {
+		if usePH {
+			if volume.VolumeName == "" {
+				source, err := k.ConfigPHSource(volume.Host)
+				if err != nil {
+					return nil, nil, nil, errors.Wrap(err, "k.ConfigPHSource failed")
+				}
+				volsource = source
+			} else {
+				volsource = k.ConfigPVCVolumeSource(volume.VolumeName, readonly)
+			}
+		} else if useEmptyVolumes {
 			volsource = k.ConfigEmptyVolumeSource("volume")
 		} else if useHostPath {
 			source, err := k.ConfigHostPathVolumeSource(volume.Host)
@@ -613,7 +633,7 @@ func (k *Kubernetes) ConfigVolumes(name string, service kobject.ServiceConfig) (
 		}
 		volumes = append(volumes, vol)
 
-		if len(volume.Host) > 0 && !useHostPath {
+		if !usePH && len(volume.Host) > 0 && !useHostPath {
 			log.Warningf("Volume mount on the host %q isn't supported - ignoring path on the host", volume.Host)
 		}
 
@@ -649,6 +669,12 @@ func (k *Kubernetes) ConfigHostPathVolumeSource(path string) (*api.VolumeSource,
 	absPath := filepath.Join(dir, path)
 	return &api.VolumeSource{
 		HostPath: &api.HostPathVolumeSource{Path: absPath},
+	}, nil
+}
+
+func (k *Kubernetes) ConfigPHSource(path string) (*api.VolumeSource, error) {
+	return &api.VolumeSource{
+		HostPath: &api.HostPathVolumeSource{Path: path},
 	}, nil
 }
 

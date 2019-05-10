@@ -455,15 +455,15 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 		}
 
 		// Configure the resource limits
-		if service.MemLimit != 0 || service.CPULimit != 0 || service.GPUs != 0 {
+		if service.MemLimit != 0 || service.CPUShares != 0 || service.GPUs != 0 {
 			resourceLimit := api.ResourceList{}
 
 			if service.MemLimit != 0 {
 				resourceLimit[api.ResourceMemory] = *resource.NewQuantity(int64(service.MemLimit), "RandomStringForFormat")
 			}
 
-			if service.CPULimit != 0 {
-				resourceLimit[api.ResourceCPU] = *resource.NewMilliQuantity(service.CPULimit, resource.DecimalSI)
+			if service.CPUShares != 0 {
+				resourceLimit[api.ResourceCPU] = *resource.NewMilliQuantity(service.CPUShares * 1000/100, resource.DecimalSI)
 			}
 
 			if service.GPUs != 0 {
