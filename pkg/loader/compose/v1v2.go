@@ -35,6 +35,66 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+
+var (
+	// 参考 pkg/loader/compose/compose.go:44
+	delTag = map[string]bool{
+		"kernel_memory":       true,
+		"memswap_reservation": true,
+		"name":                true,
+		"memswap_limit":       true,
+		"shm_size":            true,
+		"links":               true,
+		"external_links":      true,
+		"depends_on":          true,
+		"hostname":            true,
+		"oom-kill-disable":    true,
+	}
+
+	delLablesTag = map[string]bool{
+		"aliyun.log.timestamp":          true,
+		"aliyun.depends":                true,
+		"aliyun.routing.session_sticky": true,
+		"aliyun.lb.port_":               true,
+	}
+
+	v1v2ParseOptions = config.ParseOptions{
+		Interpolate: true,
+		Validate:    true,
+		Preprocess: func(baseRawServices config.RawServiceMap) (config.RawServiceMap, error) {
+
+			for service, data := range baseRawServices {
+
+				for key, value := range data {
+
+					if del, ok := delTag[key]; ok && del {
+						delete(baseRawServices[service], key)
+						log.Warningf("Unsupported %s key - ignoring", key)
+					}
+
+					if key == "labels" {
+						v := value.(map[interface{}]interface{})
+						for k := range v {
+							k2 := k.(string)
+							if del, ok := delLablesTag[k2]; ok && del {
+								delete(v, k)
+								log.Warningf("Unsupported %s label key - ignoring", k2)
+							}
+
+							if strings.HasPrefix(k2, "aliyun.lb.port_") {
+								delete(v, k)
+								log.Warningf("Unsupported %s label key - ignoring", k2)
+							}
+						}
+					}
+
+				}
+			}
+			return baseRawServices, nil
+		},
+	}
+)
+
 // Parse Docker Compose with libcompose (only supports v1 and v2). Eventually we will
 // switch to using only libcompose once v3 is supported.
 func parseV1V2(files []string) (kobject.KomposeObject, error) {
@@ -62,8 +122,10 @@ func parseV1V2(files []string) (kobject.KomposeObject, error) {
 		}
 	}
 
+	composeObject := project.NewProject(context, nil, &v1v2ParseOptions)
+
 	// Load the context and let's start parsing
-	composeObject := project.NewProject(context, nil, nil)
+	//composeObject := project.NewProject(context, nil, nil)
 	err := composeObject.Parse()
 	if err != nil {
 		return kobject.KomposeObject{}, errors.Wrap(err, "composeObject.Parse() failed, Failed to load compose file")
@@ -261,6 +323,7 @@ func libComposeToKomposeMapping(composeObject *project.Project) (kobject.Kompose
 		// convert compose labels to annotations
 		serviceConfig.Annotations = map[string]string(composeServiceConfig.Labels)
 		serviceConfig.CPUQuota = int64(composeServiceConfig.CPUQuota)
+		serviceConfig.CPUShares = int64(composeServiceConfig.CPUShares)
 		serviceConfig.CapAdd = composeServiceConfig.CapAdd
 		serviceConfig.CapDrop = composeServiceConfig.CapDrop
 		serviceConfig.Pid = composeServiceConfig.Pid
@@ -392,8 +455,13 @@ func ParseVols(volNames []string, svcName string) ([]kobject.Volumes, error) {
 	var err error
 
 	for i, vn := range volNames {
+
 		var v kobject.Volumes
+
 		v.VolumeName, v.Host, v.Container, v.Mode, err = transformer.ParseVolume(vn)
+
+		v.VolumeName = strings.Replace(strings.ToLower(v.VolumeName), "_", "-", -1) //to lower and replace "_" to "-"
+
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not parse volume %q: %v", vn, err)
 		}

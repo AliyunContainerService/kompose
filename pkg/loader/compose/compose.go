@@ -50,7 +50,7 @@ func checkUnsupportedKey(composeProject *project.Project) []string {
 	var unsupportedKey = map[string]bool{
 		"CgroupParent":  false,
 		"CPUSet":        false,
-		"CPUShares":     false,
+		"CPUShares":     true,
 		"Devices":       false,
 		"DependsOn":     false,
 		"DNS":           false,
