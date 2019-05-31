@@ -49,6 +49,7 @@ var (
 		"depends_on":          true,
 		"hostname":            true,
 		"oom-kill-disable":    true,
+		"net":   	 		   true,
 	}
 
 	delLablesTag = map[string]bool{
@@ -56,6 +57,7 @@ var (
 		"aliyun.depends":                true,
 		"aliyun.routing.session_sticky": true,
 		"aliyun.lb.port_":               true,
+		"aliyun.log_ttl_":               true,
 	}
 
 	v1v2ParseOptions = config.ParseOptions{
@@ -75,15 +77,14 @@ var (
 					if key == "labels" {
 						v := value.(map[interface{}]interface{})
 						for k := range v {
-							k2 := k.(string)
-							if del, ok := delLablesTag[k2]; ok && del {
+							if del, ok := delLablesTag[k.(string)]; ok && del {
 								delete(v, k)
-								log.Warningf("Unsupported %s label key - ignoring", k2)
+								log.Warningf("Unsupported %s label key - ignoring", k.(string))
 							}
 
-							if strings.HasPrefix(k2, "aliyun.lb.port_") {
+							if strings.HasPrefix(k.(string), "aliyun.lb.port_") || strings.HasPrefix(k.(string), "aliyun.log_ttl_") {
 								delete(v, k)
-								log.Warningf("Unsupported %s label key - ignoring", k2)
+								log.Warningf("Unsupported %s label key - ignoring", k.(string))
 							}
 						}
 					}

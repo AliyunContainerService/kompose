@@ -584,7 +584,7 @@ func parseLogConfig(key, path string) (*LogConfig, error) {
 		typ           string
 	)
 	path = strings.TrimSpace(path)
-	name := key[len(LABEL_SLS_PREFIX):]
+	name := strings.ToLower(key[len(LABEL_SLS_PREFIX):])
 	if len(name) == 0 {
 		return nil, fmt.Errorf("invalid SLS label key: %s", key)
 	}
