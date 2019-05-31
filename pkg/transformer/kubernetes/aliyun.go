@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/kubernetes/kompose/pkg/kobject"
 	"k8s.io/kubernetes/pkg/api"
+	"strings"
 )
 
 // ConfigLogVolumes configure the volumes for log.
@@ -14,7 +15,7 @@ func (k *Kubernetes) ConfigLogVolumes(name string, service kobject.ServiceConfig
 
 	for logStore, volume := range service.LogVolumes {
 		//naming volumes if multiple tmpfs are provided
-		volumeName := fmt.Sprintf("volumn-sls-%s", logStore)
+		volumeName := strings.ToLower(fmt.Sprintf("volumn-sls-%s", logStore))
 		// create a new volume mount object and append to list
 		volMount := api.VolumeMount{
 			Name:      volumeName,
